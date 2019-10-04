@@ -61,7 +61,7 @@ DEPEND="
 	x11-libs/libXtst
 	javafx? ( dev-java/openjfx:11 )
 	|| (
-		dev-java/openjdk:11
+		dev-java/openjdk:12
 		dev-java/openjdk:${SLOT}
 	)
 "
@@ -97,7 +97,7 @@ pkg_setup() {
 	openjdk_check_requirements
 	java-vm-2_pkg_setup
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-11"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-12"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -119,7 +119,7 @@ pkg_setup() {
 	if has_version --host-root dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-${SLOT}
 	elif has_version --host-root dev-java/openjdk:11; then
-		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-11
+		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-12
 	else
 		if [[ ${MERGE_TYPE} != "binary" ]]; then
 			JDK_HOME=$(best_version --host-root dev-java/openjdk-bin:${SLOT})
@@ -258,7 +258,7 @@ pkg_postinst() {
 	if use gentoo-vm ; then
 		ewarn "WARNING! You have enabled the gentoo-vm USE flag, making this JDK"
 		ewarn "recognised by the system. This will almost certainly break"
-		ewarn "many java ebuilds as they are not ready for openjdk-12"
+		ewarn "many java ebuilds as they are not ready for openjdk-13"
 	else
 		ewarn "The experimental gentoo-vm USE flag has not been enabled so this JDK"
 		ewarn "will not be recognised by the system. For example, simply calling"
