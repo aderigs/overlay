@@ -6,11 +6,11 @@ EAPI=6
 inherit autotools check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing pax-utils toolchain-funcs
 
 MY_PV="${PV}-ga"
-SLOT="${MY_PV%%[.+]*}"
+SLOT="${MY_PV%%[.+-]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
-SRC_URI="https://hg.${PN}.java.net/jdk-updates/jdk${SLOT}u/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
+SRC_URI="https://hg.${PN}.java.net/jdk/jdk${SLOT}/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
 
 LICENSE="GPL-2"
 KEYWORDS="~amd64 ~arm64 ~ppc64"
@@ -62,7 +62,7 @@ DEPEND="
 	javafx? ( dev-java/openjfx:11 )
 	|| (
 		dev-java/openjdk:${SLOT}
-		dev-java/openjdk:11
+		dev-java/openjdk:13
 	)
 "
 
@@ -73,7 +73,7 @@ PDEPEND="
 
 REQUIRED_USE="javafx? ( alsa !headless-awt )"
 
-S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV}"
+S="${WORKDIR}/jdk${SLOT}-jdk-${MY_PV}"
 
 # The space required to build varies wildly depending on USE flags,
 # ranging from 2GB to 16GB. This function is certainly not exact but
@@ -97,7 +97,7 @@ pkg_setup() {
 	openjdk_check_requirements
 	java-vm-2_pkg_setup
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-11"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-13"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -105,7 +105,7 @@ pkg_setup() {
 	# masked. First we call java-pkg-2_pkg_setup if it looks like the
 	# flag was unmasked against one of the possible build VMs. If not,
 	# we try finding one of them in their expected locations. This would
-	# have been slightly less messy if openjdk-11 had been installed to
+	# have been slightly less messy if openjdk-13 had been installed to
 	# /usr/$(get_libdir)/${PN}-${SLOT} or if there was a mechanism to install a VM env
 	# file but disable it so that it would not normally be selectable.
 
@@ -121,7 +121,7 @@ pkg_setup() {
 		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-${SLOT}
 	else
 		if [[ ${MERGE_TYPE} != "binary" ]]; then
-			JDK_HOME=$(best_version --host-root dev-java/openjdk:11)
+			JDK_HOME=$(best_version --host-root dev-java/openjdk:13)
 			[[ -n ${JDK_HOME} ]] || die "Build VM not found!"
 			JDK_HOME=${JDK_HOME#*/}
 			JDK_HOME=${EPREFIX}/usr/$(get_libdir)/${JDK_HOME%-r*}
@@ -195,7 +195,7 @@ src_configure() {
 src_compile() {
 	local myemakeargs=(
 		JOBS=$(makeopts_jobs)
-		CFLAGS_WARNINGS_ARE_ERRORS= # No -Werror
+		LOG=debug
 		$(usex doc docs '')
 		$(usex jbootstrap bootcycle-images product-images)
 	)

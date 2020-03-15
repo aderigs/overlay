@@ -61,8 +61,8 @@ DEPEND="
 	x11-libs/libXtst
 	javafx? ( dev-java/openjfx:11 )
 	|| (
-		dev-java/openjdk:12
 		dev-java/openjdk:${SLOT}
+		dev-java/openjdk:12
 	)
 "
 
@@ -105,7 +105,8 @@ pkg_setup() {
 	# masked. First we call java-pkg-2_pkg_setup if it looks like the
 	# flag was unmasked against one of the possible build VMs. If not,
 	# we try finding one of them in their expected locations. This would
-	# have been slightly less messy if there was a mechanism to install a VM env
+	# have been slightly less messy if openjdk-12 had been installed to
+	# /usr/$(get_libdir)/${PN}-${SLOT} or if there was a mechanism to install a VM env
 	# file but disable it so that it would not normally be selectable.
 
 	local vm
@@ -118,14 +119,12 @@ pkg_setup() {
 
 	if has_version --host-root dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-${SLOT}
-	elif has_version --host-root dev-java/openjdk:12; then
-		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-12
 	else
 		if [[ ${MERGE_TYPE} != "binary" ]]; then
-			JDK_HOME=$(best_version --host-root dev-java/openjdk-bin:${SLOT})
+			JDK_HOME=$(best_version --host-root dev-java/openjdk:12)
 			[[ -n ${JDK_HOME} ]] || die "Build VM not found!"
 			JDK_HOME=${JDK_HOME#*/}
-			JDK_HOME=${EPREFIX}/opt/${JDK_HOME%-r*}
+			JDK_HOME=${EPREFIX}/usr/$(get_libdir)/${JDK_HOME%-r*}
 			export JDK_HOME
 		fi
 	fi
@@ -146,7 +145,6 @@ src_configure() {
 
 	local myconf=(
 		--disable-ccache
-		--disable-warnings-as-errors
 		--enable-full-docs=no
 		--with-boot-jdk="${JDK_HOME}"
 		--with-extra-cflags="${CFLAGS}"
@@ -197,6 +195,8 @@ src_configure() {
 src_compile() {
 	local myemakeargs=(
 		JOBS=$(makeopts_jobs)
+		LOG=debug
+		CFLAGS_WARNINGS_ARE_ERRORS= # No -Werror
 		$(usex doc docs '')
 		$(usex jbootstrap bootcycle-images product-images)
 	)
@@ -233,7 +233,7 @@ src_install() {
 	dodir "${dest}"
 	cp -pPR * "${ddest}" || die
 
-	dosym "${EPREFIX}"/etc/ssl/certs/java/cacerts "${dest}"/lib/security/cacerts
+	dosym ../../../../../etc/ssl/certs/java/cacerts "${dest}"/lib/security/cacerts
 
 	# must be done before running itself
 	java-vm_set-pax-markings "${ddest}"
@@ -248,7 +248,7 @@ src_install() {
 	if use doc ; then
 		docinto html
 		dodoc -r "${S}"/build/*-release/images/docs/*
-		dosym "${EPREFIX}"/usr/share/doc/"${PF}" /usr/share/doc/"${PN}-${SLOT}"
+		dosym ../../../usr/share/doc/"${PF}" /usr/share/doc/"${PN}-${SLOT}"
 	fi
 }
 
@@ -258,7 +258,7 @@ pkg_postinst() {
 	if use gentoo-vm ; then
 		ewarn "WARNING! You have enabled the gentoo-vm USE flag, making this JDK"
 		ewarn "recognised by the system. This will almost certainly break"
-		ewarn "many java ebuilds as they are not ready for openjdk-13"
+		ewarn "many java ebuilds as they are not ready for openjdk-${SLOT}"
 	else
 		ewarn "The experimental gentoo-vm USE flag has not been enabled so this JDK"
 		ewarn "will not be recognised by the system. For example, simply calling"
