@@ -105,8 +105,8 @@ pkg_setup() {
 	# masked. First we call java-pkg-2_pkg_setup if it looks like the
 	# flag was unmasked against one of the possible build VMs. If not,
 	# we try finding one of them in their expected locations. This would
-	# have been slightly less messy if openjdk-11 had been installed to
-	# /usr/$(get_libdir)/${PN}-${SLOT} or if there was a mechanism to install a VM env
+	# have been slightly less messy if openjdk-bin had been installed to
+	# /opt/${PN}-${SLOT} or if there was a mechanism to install a VM env
 	# file but disable it so that it would not normally be selectable.
 
 	local vm

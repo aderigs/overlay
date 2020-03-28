@@ -10,7 +10,7 @@ SLOT="${MY_PV%%[.+-]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
-SRC_URI="https://hg.${PN}.java.net/jdk/jdk${SLOT}/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
+SRC_URI="https://hg.${PN}.java.net/jdk-updates/jdk${SLOT}u/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
 
 LICENSE="GPL-2"
 KEYWORDS="~amd64 ~arm64 ~ppc64"
@@ -73,7 +73,7 @@ PDEPEND="
 
 REQUIRED_USE="javafx? ( alsa !headless-awt )"
 
-S="${WORKDIR}/jdk${SLOT}-jdk-${MY_PV}"
+S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV}"
 
 # The space required to build varies wildly depending on USE flags,
 # ranging from 2GB to 16GB. This function is certainly not exact but
@@ -105,8 +105,8 @@ pkg_setup() {
 	# masked. First we call java-pkg-2_pkg_setup if it looks like the
 	# flag was unmasked against one of the possible build VMs. If not,
 	# we try finding one of them in their expected locations. This would
-	# have been slightly less messy if openjdk-13 had been installed to
-	# /usr/$(get_libdir)/${PN}-${SLOT} or if there was a mechanism to install a VM env
+	# have been slightly less messy if openjdk-bin had been installed to
+	# /opt/${PN}-${SLOT} or if there was a mechanism to install a VM env
 	# file but disable it so that it would not normally be selectable.
 
 	local vm
@@ -247,7 +247,6 @@ src_install() {
 	if use doc ; then
 		docinto html
 		dodoc -r "${S}"/build/*-release/images/docs/*
-		dosym ../../../usr/share/doc/"${PF}" /usr/share/doc/"${PN}-${SLOT}"
 	fi
 }
 
