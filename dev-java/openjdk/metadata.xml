@@ -2,8 +2,12 @@
 <!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
 	<maintainer type="person">
-		<email>achim@derigs.de</email>
-		<name>Achim Derigs</name>
+		<email>gyakovlev@gentoo.org</email>
+		<name>Georgy Yakovlev</name>
+	</maintainer>
+	<maintainer type="project">
+		<email>java@gentoo.org</email>
+		<name>Java</name>
 	</maintainer>
 	<longdescription>
 		Java™ is the world's leading programming language and platform.
@@ -11,6 +15,8 @@
 	</longdescription>
 	<slots>
 		<slot name="12">Java™ version 12</slot>
+		<slot name="13">Java™ version 13</slot>
+		<slot name="14">Java™ version 14</slot>
 	</slots>
 	<use>
 		<flag name="headless-awt">Don't install the X backend for AWT, needed by some GUIs</flag>
