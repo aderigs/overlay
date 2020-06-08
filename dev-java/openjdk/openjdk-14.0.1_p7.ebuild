@@ -5,15 +5,17 @@ EAPI=6
 
 inherit autotools check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing pax-utils toolchain-funcs
 
-MY_PV="${PV}-ga"
-SLOT="${MY_PV%%[.+-]*}"
+# we need -ga tag to fetch tarball and unpack it, but exact number everywhere else to
+# set build version properly
+MY_PV="${PV%_p*}-ga"
+SLOT="${MY_PV%%[.+]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
 SRC_URI="https://hg.${PN}.java.net/jdk-updates/jdk${SLOT}u/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
 
 LICENSE="GPL-2"
-KEYWORDS="amd64 ~arm64 ~ppc64"
+KEYWORDS="~amd64 ~arm64 ~ppc64"
 
 IUSE="alsa cups debug doc examples gentoo-vm headless-awt javafx +jbootstrap nsplugin +pch selinux source systemtap webstart"
 
@@ -90,7 +92,9 @@ openjdk_check_requirements() {
 
 pkg_pretend() {
 	openjdk_check_requirements
-	has ccache ${FEATURES} && die "FEATURES=ccache doesn't work with ${PN}"
+	if [[ ${MERGE_TYPE} != binary ]]; then
+		has ccache ${FEATURES} && die "FEATURES=ccache doesn't work with ${PN}"
+	fi
 }
 
 pkg_setup() {
@@ -139,6 +143,9 @@ src_configure() {
 	# Work around stack alignment issue, bug #647954. in case we ever have x86
 	use x86 && append-flags -mincoming-stack-boundary=2
 
+	# Work around -fno-common ( GCC10 default ), bug #713180
+	append-flags -fcommon
+
 	# Enabling full docs appears to break doc building. If not
 	# explicitly disabled, the flag will get auto-enabled if pandoc and
 	# graphviz are detected. pandoc has loads of dependencies anyway.
@@ -159,10 +166,10 @@ src_configure() {
 		--with-vendor-url="https://gentoo.org"
 		--with-vendor-bug-url="https://bugs.gentoo.org"
 		--with-vendor-vm-bug-url="https://bugs.openjdk.java.net"
-		--with-vendor-version-string="${PV}"
+		--with-vendor-version-string="${PVR}"
 		--with-version-pre=""
-		--with-version-string=${MY_PV%+*}
-		--with-version-build=${MY_PV#*+}
+		--with-version-string="${PV%_p*}"
+		--with-version-build="${PV#*_p}"
 		--with-zlib=system
 		--enable-dtrace=$(usex systemtap yes no)
 		--enable-headless-only=$(usex headless-awt yes no)
@@ -196,6 +203,7 @@ src_compile() {
 	local myemakeargs=(
 		JOBS=$(makeopts_jobs)
 		LOG=debug
+		CFLAGS_WARNINGS_ARE_ERRORS= # No -Werror
 		$(usex doc docs '')
 		$(usex jbootstrap bootcycle-images product-images)
 	)
