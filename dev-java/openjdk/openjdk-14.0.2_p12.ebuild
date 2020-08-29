@@ -255,7 +255,6 @@ src_install() {
 	if use doc ; then
 		docinto html
 		dodoc -r "${S}"/build/*-release/images/docs/*
-		test -d /usr/share/doc/${PN}-${SLOT} || dosym "${PF}" /usr/share/doc/${PN}-${SLOT}
 	fi
 }
 
