@@ -15,9 +15,9 @@ HOMEPAGE="https://openjdk.java.net"
 SRC_URI="https://hg.${PN}.java.net/jdk-updates/jdk${SLOT}u/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
 
 LICENSE="GPL-2"
-KEYWORDS="~amd64 ~arm64 ~ppc64"
+KEYWORDS="~amd64 ~arm64"
 
-IUSE="alsa cups debug doc examples gentoo-vm headless-awt javafx +jbootstrap nsplugin +pch selinux source systemtap webstart"
+IUSE="alsa cups debug doc examples gentoo-vm headless-awt javafx +jbootstrap +pch selinux source systemtap"
 
 COMMON_DEPEND="
 	media-libs/freetype:2=
@@ -63,14 +63,9 @@ DEPEND="
 	x11-libs/libXtst
 	javafx? ( dev-java/openjfx:11= )
 	|| (
-		dev-java/openjdk:${SLOT}
 		dev-java/openjdk:12
+		dev-java/openjdk:${SLOT}
 	)
-"
-
-PDEPEND="
-	webstart? ( >=dev-java/icedtea-web-1.6.1:0 )
-	nsplugin? ( >=dev-java/icedtea-web-1.6.1:0[nsplugin] )
 "
 
 REQUIRED_USE="javafx? ( alsa !headless-awt )"

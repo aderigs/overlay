@@ -8,11 +8,11 @@ inherit autotools check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing p
 # we need -ga tag to fetch tarball and unpack it, but exact number everywhere else to
 # set build version properly
 MY_PV="${PV%_p*}-ga"
-SLOT="${MY_PV%%[.+]*}"
+SLOT="${MY_PV%%[.+-]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
-SRC_URI="https://hg.${PN}.java.net/jdk-updates/jdk${SLOT}u/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
+SRC_URI="https://hg.${PN}.java.net/jdk/jdk${SLOT}/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
 
 LICENSE="GPL-2"
 KEYWORDS="~amd64 ~arm64"
@@ -63,14 +63,14 @@ DEPEND="
 	x11-libs/libXtst
 	javafx? ( dev-java/openjfx:11= )
 	|| (
-		dev-java/openjdk:13
+		dev-java/openjdk:14
 		dev-java/openjdk:${SLOT}
 	)
 "
 
 REQUIRED_USE="javafx? ( alsa !headless-awt )"
 
-S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV}"
+S="${WORKDIR}/jdk${SLOT}-jdk-${MY_PV}"
 
 # The space required to build varies wildly depending on USE flags,
 # ranging from 2GB to 16GB. This function is certainly not exact but
@@ -96,7 +96,7 @@ pkg_setup() {
 	openjdk_check_requirements
 	java-vm-2_pkg_setup
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-13"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-14"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -120,7 +120,7 @@ pkg_setup() {
 		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-${SLOT}
 	else
 		if [[ ${MERGE_TYPE} != "binary" ]]; then
-			JDK_HOME=$(best_version --host-root dev-java/openjdk:13)
+			JDK_HOME=$(best_version --host-root dev-java/openjdk:14)
 			[[ -n ${JDK_HOME} ]] || die "Build VM not found!"
 			JDK_HOME=${JDK_HOME#*/}
 			JDK_HOME=${EPREFIX}/usr/$(get_libdir)/${JDK_HOME%-r*}
