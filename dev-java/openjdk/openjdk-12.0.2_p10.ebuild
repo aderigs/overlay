@@ -1,4 +1,4 @@
-# Copyright 1999-2020 Gentoo Authors
+# Copyright 1999-2021 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=6
@@ -88,7 +88,7 @@ openjdk_check_requirements() {
 pkg_pretend() {
 	openjdk_check_requirements
 	if [[ ${MERGE_TYPE} != binary ]]; then
-		has ccache ${FEATURES} && die "FEATURES=ccache doesn't work with ${PN}"
+		has ccache ${FEATURES} && die "FEATURES=ccache doesn't work with ${PN}, bug #677876"
 	fi
 }
 
@@ -130,6 +130,7 @@ pkg_setup() {
 }
 
 src_prepare() {
+	eapply "${FILESDIR}/${P}-build.patch"
 	default
 	chmod +x configure || die
 }
@@ -147,6 +148,7 @@ src_configure() {
 
 	local myconf=(
 		--disable-ccache
+		--disable-warnings-as-errors
 		--enable-full-docs=no
 		--with-boot-jdk="${JDK_HOME}"
 		--with-extra-cflags="${CFLAGS}"
@@ -197,7 +199,6 @@ src_configure() {
 src_compile() {
 	local myemakeargs=(
 		JOBS=$(makeopts_jobs)
-		CFLAGS_WARNINGS_ARE_ERRORS= # No -Werror
 		$(usex doc docs '')
 		$(usex jbootstrap bootcycle-images product-images)
 	)
