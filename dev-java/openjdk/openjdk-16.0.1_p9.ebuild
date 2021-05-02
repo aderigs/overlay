@@ -8,11 +8,11 @@ inherit autotools check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing p
 # we need -ga tag to fetch tarball and unpack it, but exact number everywhere else to
 # set build version properly
 MY_PV="${PV%_p*}-ga"
-SLOT="${MY_PV%%[.+-]*}"
+SLOT="${MY_PV%%[.+]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
-SRC_URI="https://github.com/${PN}/jdk/archive/refs/tags/jdk-${MY_PV}.tar.gz -> ${P}.tar.gz"
+SRC_URI="https://github.com/${PN}/jdk${SLOT}u/archive/refs/tags/jdk-${MY_PV}.tar.gz -> ${P}.tar.gz"
 
 LICENSE="GPL-2"
 KEYWORDS="~amd64 ~arm64"
@@ -22,6 +22,7 @@ IUSE="alsa cups debug doc examples gentoo-vm headless-awt javafx +jbootstrap +pc
 COMMON_DEPEND="
 	media-libs/freetype:2=
 	media-libs/giflib:0/7
+	media-libs/harfbuzz:=
 	media-libs/libpng:0=
 	media-libs/lcms:2=
 	sys-libs/zlib
@@ -63,14 +64,14 @@ DEPEND="
 	x11-libs/libXtst
 	javafx? ( dev-java/openjfx:11= )
 	|| (
-		dev-java/openjdk:15
 		dev-java/openjdk:${SLOT}
+		dev-java/openjdk:15
 	)
 "
 
 REQUIRED_USE="javafx? ( alsa !headless-awt )"
 
-S="${WORKDIR}/jdk-jdk-${MY_PV}"
+S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV}"
 
 # The space required to build varies wildly depending on USE flags,
 # ranging from 2GB to 16GB. This function is certainly not exact but
@@ -152,7 +153,9 @@ src_configure() {
 		--with-extra-cflags="${CFLAGS}"
 		--with-extra-cxxflags="${CXXFLAGS}"
 		--with-extra-ldflags="${LDFLAGS}"
+		--with-freetype=system
 		--with-giflib=system
+		--with-harfbuzz=system
 		--with-lcms=system
 		--with-libjpeg=system
 		--with-libpng=system
@@ -172,7 +175,7 @@ src_configure() {
 	)
 
 	if use javafx; then
-		local zip="${EROOT%/}/usr/$(get_libdir)/openjfx-11/javafx-exports.zip"
+		local zip="${EPREFIX%/}/usr/$(get_libdir)/openjfx-11/javafx-exports.zip"
 		if [[ -r ${zip} ]]; then
 			myconf+=( --with-import-modules="${zip}" )
 		else
