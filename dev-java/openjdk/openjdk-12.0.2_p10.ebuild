@@ -12,10 +12,10 @@ SLOT="${MY_PV%%[.+]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
-SRC_URI="https://hg.${PN}.java.net/jdk-updates/jdk${SLOT}u/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
+SRC_URI="https://github.com/${PN}/jdk${SLOT}u/archive/refs/tags/jdk-${MY_PV}.tar.gz -> ${P}.tar.gz"
 
 LICENSE="GPL-2"
-KEYWORDS="~amd64 ~arm64"
+KEYWORDS="~amd64"
 
 IUSE="alsa cups debug doc examples gentoo-vm headless-awt javafx +jbootstrap +pch selinux source systemtap"
 
@@ -63,8 +63,8 @@ DEPEND="
 	x11-libs/libXtst
 	javafx? ( dev-java/openjfx:11= )
 	|| (
-		dev-java/openjdk:11
 		dev-java/openjdk:${SLOT}
+		dev-java/openjdk:11
 	)
 "
 
@@ -148,12 +148,12 @@ src_configure() {
 
 	local myconf=(
 		--disable-ccache
-		--disable-warnings-as-errors
 		--enable-full-docs=no
 		--with-boot-jdk="${JDK_HOME}"
 		--with-extra-cflags="${CFLAGS}"
 		--with-extra-cxxflags="${CXXFLAGS}"
 		--with-extra-ldflags="${LDFLAGS}"
+		--with-freetype=system
 		--with-giflib=system
 		--with-lcms=system
 		--with-libjpeg=system
@@ -170,10 +170,12 @@ src_configure() {
 		--with-zlib=system
 		--enable-dtrace=$(usex systemtap yes no)
 		--enable-headless-only=$(usex headless-awt yes no)
+		--with-toolchain-type=clang
+		--disable-warnings-as-errors
 	)
 
 	if use javafx; then
-		local zip="${EROOT%/}/usr/$(get_libdir)/openjfx-11/javafx-exports.zip"
+		local zip="${EPREFIX%/}/usr/$(get_libdir)/openjfx-11/javafx-exports.zip"
 		if [[ -r ${zip} ]]; then
 			myconf+=( --with-import-modules="${zip}" )
 		else

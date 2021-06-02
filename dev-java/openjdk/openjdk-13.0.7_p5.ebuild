@@ -1,4 +1,4 @@
-# Copyright 1999-2020 Gentoo Authors
+# Copyright 1999-2021 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=6
@@ -12,10 +12,10 @@ SLOT="${MY_PV%%[.+]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
-SRC_URI="https://hg.${PN}.java.net/jdk-updates/jdk${SLOT}u/archive/jdk-${MY_PV}.tar.bz2 -> ${P}.tar.bz2"
+SRC_URI="https://github.com/${PN}/jdk${SLOT}u/archive/refs/tags/jdk-${MY_PV}.tar.gz -> ${P}.tar.gz"
 
 LICENSE="GPL-2"
-KEYWORDS="~amd64 ~arm64"
+KEYWORDS="~amd64"
 
 IUSE="alsa cups debug doc examples gentoo-vm headless-awt javafx +jbootstrap +pch selinux source systemtap"
 
@@ -63,8 +63,8 @@ DEPEND="
 	x11-libs/libXtst
 	javafx? ( dev-java/openjfx:11= )
 	|| (
-		dev-java/openjdk:12
 		dev-java/openjdk:${SLOT}
+		dev-java/openjdk:12
 	)
 "
 
@@ -88,7 +88,7 @@ openjdk_check_requirements() {
 pkg_pretend() {
 	openjdk_check_requirements
 	if [[ ${MERGE_TYPE} != binary ]]; then
-		has ccache ${FEATURES} && die "FEATURES=ccache doesn't work with ${PN}"
+		has ccache ${FEATURES} && die "FEATURES=ccache doesn't work with ${PN}, bug #677876"
 	fi
 }
 
@@ -152,6 +152,7 @@ src_configure() {
 		--with-extra-cflags="${CFLAGS}"
 		--with-extra-cxxflags="${CXXFLAGS}"
 		--with-extra-ldflags="${LDFLAGS}"
+		--with-freetype=system
 		--with-giflib=system
 		--with-lcms=system
 		--with-libjpeg=system
@@ -168,10 +169,11 @@ src_configure() {
 		--with-zlib=system
 		--enable-dtrace=$(usex systemtap yes no)
 		--enable-headless-only=$(usex headless-awt yes no)
+		$(tc-is-clang && echo "--with-toolchain-type=clang")
 	)
 
 	if use javafx; then
-		local zip="${EROOT%/}/usr/$(get_libdir)/openjfx-11/javafx-exports.zip"
+		local zip="${EPREFIX%/}/usr/$(get_libdir)/openjfx-11/javafx-exports.zip"
 		if [[ -r ${zip} ]]; then
 			myconf+=( --with-import-modules="${zip}" )
 		else
