@@ -5,7 +5,7 @@ EAPI=7
 
 DESCRIPTION="Virtual for Java Development Kit (JDK)"
 SLOT="${PV}"
-KEYWORDS="~amd64 ~arm64"
+KEYWORDS=~amd64
 
 RDEPEND="|| (
 		dev-java/openjdk:${SLOT}[gentoo-vm(+)]
