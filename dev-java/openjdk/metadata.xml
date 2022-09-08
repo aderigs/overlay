@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
 	<maintainer type="person">
 		<email>gyakovlev@gentoo.org</email>
@@ -19,7 +19,7 @@
 		<slot name="14">Java™ version 14</slot>
 		<slot name="15">Java™ version 15</slot>
 		<slot name="16">Java™ version 16</slot>
-		<slot name="17">Java™ version 17</slot>
+		<slot name="18">Java™ version 18</slot>
 	</slots>
 	<use>
 		<flag name="headless-awt">Don't install the X backend for AWT, needed by some GUIs</flag>
@@ -28,6 +28,7 @@
 		<flag name="javafx" restrict="&gt;=dev-java/openjdk-11">Import OpenJFX modules at build time, via <pkg>dev-java/openjfx</pkg></flag>
 		<flag name="jbootstrap">Build OpenJDK twice, the second time using the result of the first</flag>
 		<flag name="source">Install JVM sources</flag>
+		<flag name="system-bootstrap">Bootstrap using installed openjdk</flag>
 		<flag name="systemtap" restrict="&gt;=dev-java/openjdk-11">Enable SystemTAP/DTrace tracing</flag>
 	</use>
 </pkgmetadata>

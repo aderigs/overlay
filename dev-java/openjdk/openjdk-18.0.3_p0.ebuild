@@ -1,23 +1,55 @@
-# Copyright 1999-2021 Gentoo Authors
+# Copyright 1999-2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=6
+EAPI=7
 
-inherit autotools check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing pax-utils toolchain-funcs
+inherit check-reqs eapi8-dosym flag-o-matic java-pkg-2 java-vm-2 multiprocessing toolchain-funcs
 
-# we need -ga tag to fetch tarball and unpack it, but exact number everywhere else to
-# set build version properly
-MY_PV="${PV%_p*}-ga"
-SLOT="${MY_PV%%[.+-]*}"
+# variable name format: <UPPERCASE_KEYWORD>_XPAK
+ARM64_XPAK="17.0.2_p8" # musl bootstrap install
+PPC64_XPAK="17.0.1_p12" # big-endian bootstrap tarball
+RISCV_XPAK="17.0.3_p7"
+X86_XPAK="17.0.1_p12"
+
+# Usage: bootstrap_uri <keyword> <version> [extracond]
+# Example: $(bootstrap_uri ppc64 17.0.1_p12 big-endian)
+# Output: ppc64? ( big-endian? ( https://...17.0.1_p12-ppc64.tar.xz ) )
+bootstrap_uri() {
+	local baseuri="https://dev.gentoo.org/~arthurzam/distfiles/dev-java/${PN}/${PN}-bootstrap"
+	local suff="tar.xz"
+	local kw="${1:?${FUNCNAME[0]}: keyword not specified}"
+	local ver="${2:?${FUNCNAME[0]}: version not specified}"
+	local cond="${3-}"
+	[[ ${cond} == elibc_musl* ]] && local musl=yes
+
+	# here be dragons
+	echo "${kw}? ( ${cond:+${cond}? (} ${baseuri}-${ver}-${kw}${musl:+-musl}.${suff} ${cond:+) })"
+}
+
+MY_PV="${PV//_p/+}"
+SLOT="$(ver_cut 1)"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.java.net"
-SRC_URI="https://github.com/${PN}/jdk${SLOT}/archive/refs/tags/jdk-${MY_PV}.tar.gz -> ${P}.tar.gz"
+SRC_URI="
+	https://github.com/${PN}/jdk${SLOT}u/archive/refs/tags/jdk-${MY_PV}.tar.gz
+		-> ${P}.tar.gz
+	!system-bootstrap? (
+		$(bootstrap_uri arm64 ${ARM64_XPAK} elibc_musl)
+		$(bootstrap_uri ppc64 ${PPC64_XPAK} big-endian)
+		$(bootstrap_uri x86 ${X86_XPAK})
+		$(bootstrap_uri riscv ${RISCV_XPAK})
+	)
+"
 
 LICENSE="GPL-2"
-KEYWORDS="~amd64"
+KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
 
-IUSE="alsa cups debug doc examples gentoo-vm headless-awt javafx +jbootstrap +pch selinux source systemtap"
+IUSE="alsa big-endian cups debug doc examples +gentoo-vm headless-awt +jbootstrap selinux source system-bootstrap systemtap"
+
+REQUIRED_USE="
+	!system-bootstrap? ( jbootstrap )
+"
 
 COMMON_DEPEND="
 	media-libs/freetype:2=
@@ -26,7 +58,7 @@ COMMON_DEPEND="
 	media-libs/libpng:0=
 	media-libs/lcms:2=
 	sys-libs/zlib
-	virtual/jpeg:0=
+	media-libs/libjpeg-turbo:0=
 	systemtap? ( dev-util/systemtap )
 "
 
@@ -62,16 +94,15 @@ DEPEND="
 	x11-libs/libXrender
 	x11-libs/libXt
 	x11-libs/libXtst
-	javafx? ( dev-java/openjfx:11= )
-	|| (
-		dev-java/openjdk:${SLOT}
-		dev-java/openjdk:16
+	system-bootstrap? (
+		|| (
+			dev-java/openjdk:${SLOT}
+			dev-java/openjdk:17
+		)
 	)
 "
 
-REQUIRED_USE="javafx? ( alsa !headless-awt )"
-
-S="${WORKDIR}/jdk${SLOT}-jdk-${MY_PV}"
+S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV//+/-}"
 
 # The space required to build varies wildly depending on USE flags,
 # ranging from 2GB to 16GB. This function is certainly not exact but
@@ -97,7 +128,9 @@ pkg_setup() {
 	openjdk_check_requirements
 	java-vm-2_pkg_setup
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-16"
+	[[ ${MERGE_TYPE} == "binary" ]] && return
+
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-17"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -111,36 +144,41 @@ pkg_setup() {
 
 	local vm
 	for vm in ${JAVA_PKG_WANT_BUILD_VM}; do
-		if [[ -d ${EPREFIX}/usr/lib/jvm/${vm} ]]; then
+		if [[ -d ${BROOT}/usr/lib/jvm/${vm} ]]; then
 			java-pkg-2_pkg_setup
 			return
 		fi
 	done
-
-	if has_version --host-root dev-java/openjdk:${SLOT}; then
-		export JDK_HOME=${EPREFIX}/usr/$(get_libdir)/openjdk-${SLOT}
-	else
-		if [[ ${MERGE_TYPE} != "binary" ]]; then
-			JDK_HOME=$(best_version --host-root dev-java/openjdk:16)
-			[[ -n ${JDK_HOME} ]] || die "Build VM not found!"
-			JDK_HOME=${JDK_HOME#*/}
-			JDK_HOME=${EPREFIX}/usr/$(get_libdir)/${JDK_HOME%-r*}
-			export JDK_HOME
-		fi
-	fi
 }
 
 src_prepare() {
+	use riscv && eapply "${WORKDIR}"/openjdk-17.0.3-riscv.patch
 	default
 	chmod +x configure || die
 }
 
 src_configure() {
+	if has_version dev-java/openjdk:${SLOT}; then
+		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
+	elif use !system-bootstrap ; then
+		local xpakvar="${ARCH^^}_XPAK"
+		export JDK_HOME="${WORKDIR}/openjdk-bootstrap-${!xpakvar}"
+	else
+		JDK_HOME=$(best_version -b dev-java/openjdk:17)
+		[[ -n ${JDK_HOME} ]] || die "Build VM not found!"
+		JDK_HOME=${JDK_HOME#*/}
+		JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-17
+		export JDK_HOME
+	fi
+
 	# Work around stack alignment issue, bug #647954. in case we ever have x86
 	use x86 && append-flags -mincoming-stack-boundary=2
 
 	# Work around -fno-common ( GCC10 default ), bug #713180
 	append-flags -fcommon
+
+	# Strip some flags users may set, but should not. #818502
+	filter-flags -fexceptions
 
 	# Enabling full docs appears to break doc building. If not
 	# explicitly disabled, the flag will get auto-enabled if pandoc and
@@ -148,17 +186,19 @@ src_configure() {
 
 	local myconf=(
 		--disable-ccache
+		--disable-precompiled-headers
+		--disable-warnings-as-errors
 		--enable-full-docs=no
 		--with-boot-jdk="${JDK_HOME}"
 		--with-extra-cflags="${CFLAGS}"
 		--with-extra-cxxflags="${CXXFLAGS}"
 		--with-extra-ldflags="${LDFLAGS}"
-		--with-freetype=system
-		--with-giflib=system
-		--with-harfbuzz=system
-		--with-lcms=system
-		--with-libjpeg=system
-		--with-libpng=system
+		--with-freetype="${XPAK_BOOTSTRAP:-system}"
+		--with-giflib="${XPAK_BOOTSTRAP:-system}"
+		--with-harfbuzz="${XPAK_BOOTSTRAP:-system}"
+		--with-lcms="${XPAK_BOOTSTRAP:-system}"
+		--with-libjpeg="${XPAK_BOOTSTRAP:-system}"
+		--with-libpng="${XPAK_BOOTSTRAP:-system}"
 		--with-native-debug-symbols=$(usex debug internal none)
 		--with-vendor-name="Gentoo"
 		--with-vendor-url="https://gentoo.org"
@@ -168,26 +208,17 @@ src_configure() {
 		--with-version-pre=""
 		--with-version-string="${PV%_p*}"
 		--with-version-build="${PV#*_p}"
-		--with-zlib=system
+		--with-zlib="${XPAK_BOOTSTRAP:-system}"
 		--enable-dtrace=$(usex systemtap yes no)
 		--enable-headless-only=$(usex headless-awt yes no)
 		$(tc-is-clang && echo "--with-toolchain-type=clang")
 	)
 
-	if use javafx; then
-		local zip="${EPREFIX%/}/usr/$(get_libdir)/openjfx-11/javafx-exports.zip"
-		if [[ -r ${zip} ]]; then
-			myconf+=( --with-import-modules="${zip}" )
-		else
-			die "${zip} not found or not readable"
-		fi
-	fi
+	use riscv && myconf+=( --with-boot-jdk-jvmargs="-Djdk.lang.Process.launchMechanism=vfork" )
 
-	# PaX breaks pch, bug #601016
-	if use pch && ! host-is-pax; then
-		myconf+=( --enable-precompiled-headers )
-	else
-		myconf+=( --disable-precompiled-headers )
+	if use !system-bootstrap ; then
+		addpredict /dev/random
+		addpredict /proc/self/coredump_filter
 	fi
 
 	(
@@ -203,6 +234,7 @@ src_compile() {
 		JOBS=$(makeopts_jobs)
 		LOG=debug
 		CFLAGS_WARNINGS_ARE_ERRORS= # No -Werror
+		NICE= # Use PORTAGE_NICENESS, don't adjust further down
 		$(usex doc docs '')
 		$(usex jbootstrap bootcycle-images product-images)
 	)
@@ -211,7 +243,7 @@ src_compile() {
 
 src_install() {
 	local dest="/usr/$(get_libdir)/${PN}-${SLOT}"
-	local ddest="${ED}${dest#/}"
+	local ddest="${ED}/${dest#/}"
 
 	cd "${S}"/build/*-release/images/jdk || die
 
@@ -239,7 +271,7 @@ src_install() {
 	dodir "${dest}"
 	cp -pPR * "${ddest}" || die
 
-	dosym ../../../../../etc/ssl/certs/java/cacerts "${dest}"/lib/security/cacerts
+	dosym8 -r /etc/ssl/certs/java/cacerts "${dest}"/lib/security/cacerts
 
 	# must be done before running itself
 	java-vm_set-pax-markings "${ddest}"
@@ -247,28 +279,17 @@ src_install() {
 	einfo "Creating the Class Data Sharing archives and disabling usage tracking"
 	"${ddest}/bin/java" -server -Xshare:dump -Djdk.disableLastUsageTracking || die
 
-	use gentoo-vm && java-vm_install-env "${FILESDIR}"/${PN}-${SLOT}.env.sh
+	use gentoo-vm && java-vm_install-env "${FILESDIR}"/${PN}.env.sh
 	java-vm_revdep-mask
 	java-vm_sandbox-predict /dev/random /proc/self/coredump_filter
 
 	if use doc ; then
 		docinto html
 		dodoc -r "${S}"/build/*-release/images/docs/*
+		dosym ../../../usr/share/doc/"${PF}" /usr/share/doc/"${PN}-${SLOT}"
 	fi
 }
 
 pkg_postinst() {
 	java-vm-2_pkg_postinst
-
-	if use gentoo-vm ; then
-		ewarn "WARNING! You have enabled the gentoo-vm USE flag, making this JDK"
-		ewarn "recognised by the system. This will almost certainly break"
-		ewarn "many java ebuilds as they are not ready for openjdk-${SLOT}"
-	else
-		ewarn "The experimental gentoo-vm USE flag has not been enabled so this JDK"
-		ewarn "will not be recognised by the system. For example, simply calling"
-		ewarn "\"java\" will launch a different JVM. This is necessary until Gentoo"
-		ewarn "fully supports Java ${SLOT}. This JDK must therefore be invoked using its"
-		ewarn "absolute location under ${EPREFIX}/usr/$(get_libdir)/${PN}-${SLOT}."
-	fi
 }
