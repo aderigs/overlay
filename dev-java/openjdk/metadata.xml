@@ -14,12 +14,8 @@
 		The code for Java is open source and available at OpenJDK™.
 	</longdescription>
 	<slots>
-		<slot name="12">Java™ version 12</slot>
-		<slot name="13">Java™ version 13</slot>
-		<slot name="14">Java™ version 14</slot>
-		<slot name="15">Java™ version 15</slot>
-		<slot name="16">Java™ version 16</slot>
 		<slot name="18">Java™ version 18</slot>
+		<slot name="18">Java™ version 19</slot>
 	</slots>
 	<use>
 		<flag name="headless-awt">Don't install the X backend for AWT, needed by some GUIs</flag>
@@ -31,4 +27,8 @@
 		<flag name="system-bootstrap">Bootstrap using installed openjdk</flag>
 		<flag name="systemtap" restrict="&gt;=dev-java/openjdk-11">Enable SystemTAP/DTrace tracing</flag>
 	</use>
+	<upstream>
+		<remote-id type="github">openjdk/jdk18u</remote-id>
+		<remote-id type="github">openjdk/jdk19u</remote-id>
+	</upstream>
 </pkgmetadata>
