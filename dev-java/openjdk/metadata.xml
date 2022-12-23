@@ -15,7 +15,7 @@
 	</longdescription>
 	<slots>
 		<slot name="18">Java™ version 18</slot>
-		<slot name="18">Java™ version 19</slot>
+		<slot name="19">Java™ version 19</slot>
 	</slots>
 	<use>
 		<flag name="headless-awt">Don't install the X backend for AWT, needed by some GUIs</flag>

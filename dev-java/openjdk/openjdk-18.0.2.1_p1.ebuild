@@ -26,11 +26,17 @@ bootstrap_uri() {
 	echo "${kw}? ( ${cond:+${cond}? (} ${baseuri}-${ver}-${kw}${musl:+-musl}.${suff} ${cond:+) })"
 }
 
-MY_PV="${PV//_p/+}"
-SLOT="$(ver_cut 1)"
+# don't change versioning scheme
+# to find correct _p number, look at
+# https://github.com/openjdk/jdk${SLOT}u/tags
+# you will see, for example, jdk-17.0.4.1-ga and jdk-17.0.4.1+1, both point
+# to exact same commit sha. we should always use the full version.
+# -ga tag is just for humans to easily identify General Availability release tag.
+MY_PV="${PV%_p*}-ga"
+SLOT="${MY_PV%%[.+]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
-HOMEPAGE="https://openjdk.java.net"
+HOMEPAGE="https://openjdk.org"
 SRC_URI="
 	https://github.com/${PN}/jdk${SLOT}u/archive/refs/tags/jdk-${MY_PV}.tar.gz
 		-> ${P}.tar.gz
@@ -40,14 +46,17 @@ SRC_URI="
 		$(bootstrap_uri x86 ${X86_XPAK})
 		$(bootstrap_uri riscv ${RISCV_XPAK})
 	)
+	riscv? ( https://dev.gentoo.org/~gyakovlev/distfiles/dev-java/openjdk/java17-riscv64.patch )
 "
+# riscv patch origin: https://raw.githubusercontent.com/felixonmars/archriscv-packages/master/java17-openjdk/java17-riscv64.patch
 
 LICENSE="GPL-2"
 KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
 
-IUSE="alsa big-endian cups debug doc examples +gentoo-vm headless-awt +jbootstrap selinux source system-bootstrap systemtap"
+IUSE="alsa big-endian cups debug doc examples headless-awt javafx +jbootstrap selinux source system-bootstrap systemtap"
 
 REQUIRED_USE="
+	javafx? ( alsa !headless-awt )
 	!system-bootstrap? ( jbootstrap )
 "
 
@@ -96,6 +105,7 @@ DEPEND="
 	x11-libs/libXtst
 	system-bootstrap? (
 		|| (
+			dev-java/openjdk-bin:${SLOT}
 			dev-java/openjdk:${SLOT}
 			dev-java/openjdk:17
 		)
@@ -130,7 +140,7 @@ pkg_setup() {
 
 	[[ ${MERGE_TYPE} == "binary" ]] && return
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-17"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-17 openjdk-bin-${SLOT}"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -152,7 +162,7 @@ pkg_setup() {
 }
 
 src_prepare() {
-	use riscv && eapply "${WORKDIR}"/openjdk-17.0.3-riscv.patch
+	use riscv && eapply "${DISTDIR}"/java17-riscv64.patch
 	default
 	chmod +x configure || die
 }
@@ -160,14 +170,16 @@ src_prepare() {
 src_configure() {
 	if has_version dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
+	elif has_version dev-java/openjdk:17; then
+		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-17
 	elif use !system-bootstrap ; then
 		local xpakvar="${ARCH^^}_XPAK"
 		export JDK_HOME="${WORKDIR}/openjdk-bootstrap-${!xpakvar}"
 	else
-		JDK_HOME=$(best_version -b dev-java/openjdk:17)
+		JDK_HOME=$(best_version -b dev-java/openjdk-bin:${SLOT})
 		[[ -n ${JDK_HOME} ]] || die "Build VM not found!"
 		JDK_HOME=${JDK_HOME#*/}
-		JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-17
+		JDK_HOME=${BROOT}/opt/${JDK_HOME%-r*}
 		export JDK_HOME
 	fi
 
@@ -215,6 +227,15 @@ src_configure() {
 	)
 
 	use riscv && myconf+=( --with-boot-jdk-jvmargs="-Djdk.lang.Process.launchMechanism=vfork" )
+
+	if use javafx; then
+		local zip="${EPREFIX}/usr/$(get_libdir)/openjfx-${SLOT}/javafx-exports.zip"
+		if [[ -r ${zip} ]]; then
+			myconf+=( --with-import-modules="${zip}" )
+		else
+			die "${zip} not found or not readable"
+		fi
+	fi
 
 	if use !system-bootstrap ; then
 		addpredict /dev/random
@@ -279,7 +300,7 @@ src_install() {
 	einfo "Creating the Class Data Sharing archives and disabling usage tracking"
 	"${ddest}/bin/java" -server -Xshare:dump -Djdk.disableLastUsageTracking || die
 
-	use gentoo-vm && java-vm_install-env "${FILESDIR}"/${PN}.env.sh
+	java-vm_install-env "${FILESDIR}"/${PN}.env.sh
 	java-vm_revdep-mask
 	java-vm_sandbox-predict /dev/random /proc/self/coredump_filter
 

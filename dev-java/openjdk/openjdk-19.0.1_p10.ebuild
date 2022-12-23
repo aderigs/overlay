@@ -103,11 +103,11 @@ DEPEND="
 	x11-libs/libXrender
 	x11-libs/libXt
 	x11-libs/libXtst
-	javafx? ( dev-java/openjfx:${SLOT}= )
 	system-bootstrap? (
 		|| (
-			dev-java/openjdk:18
+			dev-java/openjdk-bin:${SLOT}
 			dev-java/openjdk:${SLOT}
+			dev-java/openjdk:18
 		)
 	)
 "
@@ -140,7 +140,7 @@ pkg_setup() {
 
 	[[ ${MERGE_TYPE} == "binary" ]] && return
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-18"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-18 openjdk-bin-${SLOT}"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -148,7 +148,8 @@ pkg_setup() {
 	# masked. First we call java-pkg-2_pkg_setup if it looks like the
 	# flag was unmasked against one of the possible build VMs. If not,
 	# we try finding one of them in their expected locations. This would
-	# have been slightly less messy if there was a mechanism to install a VM env
+	# have been slightly less messy if openjdk-bin had been installed to
+	# /opt/${PN}-${SLOT} or if there was a mechanism to install a VM env
 	# file but disable it so that it would not normally be selectable.
 
 	local vm
@@ -169,13 +170,16 @@ src_prepare() {
 src_configure() {
 	if has_version dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
+	elif has_version dev-java/openjdk:18; then
+		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-18
 	elif use !system-bootstrap ; then
 		local xpakvar="${ARCH^^}_XPAK"
 		export JDK_HOME="${WORKDIR}/openjdk-bootstrap-${!xpakvar}"
 	else
-		JDK_HOME=$(best_version -b dev-java/openjdk:18)
+		JDK_HOME=$(best_version -b dev-java/openjdk-bin:${SLOT})
 		[[ -n ${JDK_HOME} ]] || die "Build VM not found!"
-		JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-18
+		JDK_HOME=${JDK_HOME#*/}
+		JDK_HOME=${BROOT}/opt/${JDK_HOME%-r*}
 		export JDK_HOME
 	fi
 
