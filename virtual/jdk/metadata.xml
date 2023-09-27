@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
-	<maintainer type="project">
-		<email>java@gentoo.org</email>
-		<name>Java</name>
+	<maintainer type="person">
+		<email>achim@derigs.de</email>
+		<name>Achim Derigs</name>
 	</maintainer>
 	<use>
 		<flag name="headless-awt">Don't install the X backend for AWT, needed by some GUIs</flag>
