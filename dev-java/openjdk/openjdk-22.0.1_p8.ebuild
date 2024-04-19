@@ -1,15 +1,13 @@
-# Copyright 1999-2023 Gentoo Authors
+# Copyright 1999-2024 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=7
+EAPI=8
 
-inherit check-reqs eapi8-dosym flag-o-matic java-pkg-2 java-vm-2 multiprocessing toolchain-funcs
+inherit check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing toolchain-funcs
 
 # variable name format: <UPPERCASE_KEYWORD>_XPAK
-ARM64_XPAK="17.0.2_p8" # musl bootstrap install
-PPC64_XPAK="17.0.1_p12" # big-endian bootstrap tarball
-RISCV_XPAK="17.0.3_p7"
-X86_XPAK="17.0.1_p12"
+PPC64_XPAK="21.0.0_p35" # big-endian bootstrap tarball
+X86_XPAK="21.0.0_p35"
 
 # Usage: bootstrap_uri <keyword> <version> [extracond]
 # Example: $(bootstrap_uri ppc64 17.0.1_p12 big-endian)
@@ -33,32 +31,29 @@ bootstrap_uri() {
 # to exact same commit sha. we should always use the full version.
 # -ga tag is just for humans to easily identify General Availability release tag.
 MY_PV="${PV%_p*}-ga"
-SLOT="${MY_PV%%[.+]*}"
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.org"
 SRC_URI="
-	https://github.com/${PN}/jdk${SLOT}u/archive/refs/tags/jdk-${MY_PV}.tar.gz
+	https://github.com/${PN}/jdk22u/archive/jdk-${MY_PV}.tar.gz
 		-> ${P}.tar.gz
 	!system-bootstrap? (
-		$(bootstrap_uri arm64 ${ARM64_XPAK} elibc_musl)
 		$(bootstrap_uri ppc64 ${PPC64_XPAK} big-endian)
 		$(bootstrap_uri x86 ${X86_XPAK})
-		$(bootstrap_uri riscv ${RISCV_XPAK})
 	)
-	riscv? ( https://dev.gentoo.org/~gyakovlev/distfiles/dev-java/openjdk/java17-riscv64.patch )
 "
-# riscv patch origin:
-# https://raw.githubusercontent.com/felixonmars/archriscv-packages/master/java17-openjdk/java17-riscv64.patch
+S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV//+/-}"
 
 LICENSE="GPL-2-with-classpath-exception"
-KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
+SLOT="${MY_PV%%[.+]*}"
+KEYWORDS="~amd64 ~arm64 ~ppc64 ~x86"
 
-IUSE="alsa big-endian cups debug doc examples headless-awt javafx +jbootstrap lto selinux source system-bootstrap systemtap"
+IUSE="alsa big-endian cups debug doc examples headless-awt javafx +jbootstrap lto selinux source +system-bootstrap systemtap"
 
 REQUIRED_USE="
 	javafx? ( alsa !headless-awt )
 	!system-bootstrap? ( jbootstrap )
+	!system-bootstrap? ( || ( ppc64 x86 ) )
 "
 
 COMMON_DEPEND="
@@ -69,7 +64,7 @@ COMMON_DEPEND="
 	media-libs/lcms:2=
 	sys-libs/zlib
 	media-libs/libjpeg-turbo:0=
-	systemtap? ( dev-util/systemtap )
+	systemtap? ( dev-debug/systemtap )
 "
 
 # Many libs are required to build, but not to run, make is possible to remove
@@ -106,13 +101,11 @@ DEPEND="
 	x11-libs/libXtst
 	system-bootstrap? (
 		|| (
-			dev-java/openjdk:19
+			dev-java/openjdk:21
 			dev-java/openjdk:${SLOT}
 		)
 	)
 "
-
-S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV//+/-}"
 
 # The space required to build varies wildly depending on USE flags,
 # ranging from 2GB to 16GB. This function is certainly not exact but
@@ -140,7 +133,7 @@ pkg_setup() {
 
 	[[ ${MERGE_TYPE} == "binary" ]] && return
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-19 openjdk-bin-${SLOT}"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-21"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -162,7 +155,6 @@ pkg_setup() {
 }
 
 src_prepare() {
-	use riscv && eapply "${DISTDIR}"/java17-riscv64.patch
 	default
 	chmod +x configure || die
 }
@@ -170,8 +162,8 @@ src_prepare() {
 src_configure() {
 	if has_version dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
-	elif has_version dev-java/openjdk:19; then
-		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-19
+	elif has_version dev-java/openjdk:21; then
+		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-21
 	elif use !system-bootstrap ; then
 		local xpakvar="${ARCH^^}_XPAK"
 		export JDK_HOME="${WORKDIR}/openjdk-bootstrap-${!xpakvar}"
@@ -186,8 +178,8 @@ src_configure() {
 	# Work around stack alignment issue, bug #647954. in case we ever have x86
 	use x86 && append-flags -mincoming-stack-boundary=2
 
-	# Work around -fno-common ( GCC10 default ), bug #713180
-	append-flags -fcommon
+	# bug 906987; append-cppflags doesnt work
+	use elibc_musl && append-flags -D_LARGEFILE64_SOURCE
 
 	# Strip some flags users may set, but should not. #818502
 	filter-flags -fexceptions
@@ -271,7 +263,7 @@ src_compile() {
 		$(usex doc docs '')
 		$(usex jbootstrap bootcycle-images product-images)
 	)
-	emake "${myemakeargs[@]}" -j1 #nowarn
+	emake "${myemakeargs[@]}" -j1
 }
 
 src_install() {
@@ -304,7 +296,7 @@ src_install() {
 	dodir "${dest}"
 	cp -pPR * "${ddest}" || die
 
-	dosym8 -r /etc/ssl/certs/java/cacerts "${dest}"/lib/security/cacerts
+	dosym -r /etc/ssl/certs/java/cacerts "${dest}"/lib/security/cacerts
 
 	# must be done before running itself
 	java-vm_set-pax-markings "${ddest}"
