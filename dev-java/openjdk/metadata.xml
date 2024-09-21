@@ -11,6 +11,7 @@
 	</longdescription>
 	<slots>
 		<slot name="22">Java™ version 22</slot>
+		<slot name="23">Java™ version 23</slot>
 	</slots>
 	<use>
 		<flag name="headless-awt">Don't install the X backend for AWT, needed by some GUIs</flag>
@@ -19,9 +20,10 @@
 		<flag name="jbootstrap">Build OpenJDK twice, the second time using the result of the first</flag>
 		<flag name="source">Install JVM sources</flag>
 		<flag name="system-bootstrap">Bootstrap using installed openjdk</flag>
-		<flag name="systemtap" restrict="&gt;=dev-java/openjdk-11">Enable SystemTAP/DTrace tracing</flag>
+		<flag name="systemtap" restrict="&gt;=dev-java/openjdk-11">Enable SystemTap/DTrace tracing</flag>
 	</use>
 	<upstream>
 		<remote-id type="github">openjdk/jdk22u</remote-id>
+		<remote-id type="github">openjdk/jdk23u</remote-id>
 	</upstream>
 </pkgmetadata>
