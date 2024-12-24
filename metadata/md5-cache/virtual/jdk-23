@@ -3,6 +3,6 @@ DESCRIPTION=Virtual for Java Development Kit (JDK)
 EAPI=8
 IUSE=headless-awt
 KEYWORDS=~amd64 ~arm64 ~ppc64 ~x86
-RDEPEND=|| ( dev-java/openjdk-bin:22[gentoo-vm(+),headless-awt=] dev-java/openjdk:22[gentoo-vm(+),headless-awt=] )
-SLOT=22
+RDEPEND=|| ( dev-java/openjdk-bin:23[gentoo-vm(+),headless-awt=] dev-java/openjdk:23[gentoo-vm(+),headless-awt=] )
+SLOT=23
 _md5_=afa88b8cc39551954c10b2a5a21e017f

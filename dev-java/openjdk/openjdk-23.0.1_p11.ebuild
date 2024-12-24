@@ -35,7 +35,7 @@ MY_PV="${PV%_p*}-ga"
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.org"
 SRC_URI="
-	https://github.com/${PN}/jdk22u/archive/jdk-${MY_PV}.tar.gz
+	https://github.com/${PN}/jdk23u/archive/jdk-${MY_PV}.tar.gz
 		-> ${P}.tar.gz
 	!system-bootstrap? (
 		$(bootstrap_uri ppc64 ${PPC64_XPAK} big-endian)
@@ -104,11 +104,13 @@ DEPEND="
 	system-bootstrap? (
 		|| (
 			dev-java/openjdk-bin:${SLOT}
-			dev-java/openjdk:21
+			dev-java/openjdk:22
 			dev-java/openjdk:${SLOT}
 		)
 	)
 "
+
+PATCHES=( "${FILESDIR}/openjdk-23_p37-LIBFONTMANAGER_CFLAGS.patch" )
 
 # The space required to build varies wildly depending on USE flags,
 # ranging from 2GB to 16GB. This function is certainly not exact but
@@ -136,7 +138,7 @@ pkg_setup() {
 
 	[[ ${MERGE_TYPE} == "binary" ]] && return
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-21 openjdk-bin-${SLOT}"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-22 openjdk-bin-${SLOT}"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -165,8 +167,8 @@ src_prepare() {
 src_configure() {
 	if has_version dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
-	elif has_version dev-java/openjdk:21; then
-		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-21
+	elif has_version dev-java/openjdk:22; then
+		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-22
 	elif use !system-bootstrap ; then
 		local xpakvar="${ARCH^^}_XPAK"
 		export JDK_HOME="${WORKDIR}/openjdk-bootstrap-${!xpakvar}"
