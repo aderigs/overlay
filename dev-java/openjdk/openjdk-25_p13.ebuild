@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -7,7 +7,6 @@ inherit check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing toolchain-f
 
 # variable name format: <UPPERCASE_KEYWORD>_XPAK
 PPC64_XPAK="21.0.0_p35" # big-endian bootstrap tarball
-X86_XPAK="21.0.0_p35"
 
 # Usage: bootstrap_uri <keyword> <version> [extracond]
 # Example: $(bootstrap_uri ppc64 17.0.1_p12 big-endian)
@@ -36,19 +35,19 @@ MY_PV="${PV/_p/+}"
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.org"
 SRC_URI="
-	https://github.com/${PN}/jdk24u/archive/jdk-${MY_PV}.tar.gz
+	https://github.com/${PN}/jdk/archive/jdk-${MY_PV}.tar.gz
 
 		-> ${P}.tar.gz
 	!system-bootstrap? (
 		$(bootstrap_uri ppc64 ${PPC64_XPAK} big-endian)
-		$(bootstrap_uri x86 ${X86_XPAK})
 	)
 "
-S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV//+/-}"
+# S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV//+/-}"
+S="${WORKDIR}/jdk-jdk-${MY_PV//+/-}"
 
 LICENSE="GPL-2-with-classpath-exception"
 SLOT="${MY_PV%%[.+]*}"
-KEYWORDS="~amd64 ~arm64 ~ppc64 ~x86"
+KEYWORDS="~amd64 ~arm64 ~ppc64"
 
 # lto temporarily disabled due to https://bugs.gentoo.org/916735
 IUSE="alsa big-endian cups debug doc examples headless-awt javafx +jbootstrap selinux source +system-bootstrap systemtap"
@@ -56,7 +55,7 @@ IUSE="alsa big-endian cups debug doc examples headless-awt javafx +jbootstrap se
 REQUIRED_USE="
 	javafx? ( alsa !headless-awt )
 	!system-bootstrap? ( jbootstrap )
-	!system-bootstrap? ( || ( ppc64 x86 ) )
+	!system-bootstrap? ( ppc64 )
 "
 
 COMMON_DEPEND="
@@ -106,7 +105,7 @@ DEPEND="
 	system-bootstrap? (
 		|| (
 			dev-java/openjdk-bin:${SLOT}
-			dev-java/openjdk:23
+			dev-java/openjdk:24
 			dev-java/openjdk:${SLOT}
 		)
 	)
@@ -138,7 +137,7 @@ pkg_setup() {
 
 	[[ ${MERGE_TYPE} == "binary" ]] && return
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-23 openjdk-bin-${SLOT}"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-24 openjdk-bin-${SLOT}"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -167,8 +166,8 @@ src_prepare() {
 src_configure() {
 	if has_version dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
-	elif has_version dev-java/openjdk:23; then
-		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-23
+	elif has_version dev-java/openjdk:24; then
+		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-24
 	elif use !system-bootstrap ; then
 		local xpakvar="${ARCH^^}_XPAK"
 		export JDK_HOME="${WORKDIR}/openjdk-bootstrap-${!xpakvar}"
@@ -179,9 +178,6 @@ src_configure() {
 		JDK_HOME=${BROOT}/opt/${JDK_HOME%-r*}
 		export JDK_HOME
 	fi
-
-	# Work around stack alignment issue, bug #647954. in case we ever have x86
-	use x86 && append-flags -mincoming-stack-boundary=2
 
 	# bug 906987; append-cppflags doesnt work
 	use elibc_musl && append-flags -D_LARGEFILE64_SOURCE
@@ -214,6 +210,7 @@ src_configure() {
 		--with-lcms="${XPAK_BOOTSTRAP:-system}"
 		--with-libjpeg="${XPAK_BOOTSTRAP:-system}"
 		--with-libpng="${XPAK_BOOTSTRAP:-system}"
+		--with-stdc++lib=dynamic
 		--with-native-debug-symbols=$(usex debug internal none)
 		--with-vendor-name="Gentoo"
 		--with-vendor-url="https://gentoo.org"
