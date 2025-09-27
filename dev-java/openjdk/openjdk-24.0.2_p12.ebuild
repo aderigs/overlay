@@ -3,11 +3,13 @@
 
 EAPI=8
 
+# Avoid circular dependency
+JAVA_DISABLE_DEPEND_ON_JAVA_DEP_CHECK="true"
+
 inherit check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing toolchain-funcs
 
 # variable name format: <UPPERCASE_KEYWORD>_XPAK
 PPC64_XPAK="21.0.0_p35" # big-endian bootstrap tarball
-X86_XPAK="21.0.0_p35"
 
 # Usage: bootstrap_uri <keyword> <version> [extracond]
 # Example: $(bootstrap_uri ppc64 17.0.1_p12 big-endian)
@@ -30,31 +32,53 @@ bootstrap_uri() {
 # you will see, for example, jdk-17.0.4.1-ga and jdk-17.0.4.1+1, both point
 # to exact same commit sha. we should always use the full version.
 # -ga tag is just for humans to easily identify General Availability release tag.
-MY_PV="${PV%_p*}-ga"
+# MY_PV="${PV%_p*}-ga"
+
+# Upstream starts new major versions usually in https://github.com/openjdk/jdk.
+# In ebuilds for those early versions, use '_alpha' in the version string.
+# Exapmle: openjdk-26_alpha10.ebuild
+# Later, upstream creates the versioned repository like e.g.
+# https://github.com/openjdk/jdk25u.
+# In ebuilds for those later versions, use '_beta' in the version string.
+# Example: openjdk-25_beta35.ebuild
+if [[ "${PV%_alpha*}" != "${PV}" ]]; then # version string contains "_alpha"
+	MY_PV="${PV/_alpha/+}"
+	JDK_REPO="jdk"
+	MY_VERSION_STRING="${PV%_alpha*}"
+	MY_VERSION_BUILD="${PV#*_alpha}"
+elif [[ "${PV%_beta*}" != "${PV}" ]]; then # version string contains "_beta"
+	MY_PV="${PV/_beta/+}"
+	JDK_REPO="jdk$(ver_cut 1)u"
+	MY_VERSION_STRING="${PV%_beta*}"
+	MY_VERSION_BUILD="${PV#*_beta}"
+else
+	MY_PV="${PV%_p*}-ga"
+	JDK_REPO="jdk$(ver_cut 1)u"
+	MY_VERSION_STRING="${PV%_p*}"
+	MY_VERSION_BUILD="${PV#*_p}"
+fi
 
 DESCRIPTION="Open source implementation of the Java programming language"
 HOMEPAGE="https://openjdk.org"
 SRC_URI="
-	https://github.com/${PN}/jdk24u/archive/jdk-${MY_PV}.tar.gz
+	https://github.com/${PN}/${JDK_REPO}/archive/jdk-${MY_PV}.tar.gz
 		-> ${P}.tar.gz
 	!system-bootstrap? (
 		$(bootstrap_uri ppc64 ${PPC64_XPAK} big-endian)
-		$(bootstrap_uri x86 ${X86_XPAK})
 	)
 "
-S="${WORKDIR}/jdk${SLOT}u-jdk-${MY_PV//+/-}"
+S="${WORKDIR}/${JDK_REPO}-jdk-${MY_PV//+/-}"
 
 LICENSE="GPL-2-with-classpath-exception"
-SLOT="${MY_PV%%[.+-]*}"
-KEYWORDS="~amd64 ~arm64 ~ppc64 ~x86"
+SLOT="$(ver_cut 1)"
+KEYWORDS="~amd64"
 
-# lto temporarily disabled due to https://bugs.gentoo.org/916735
 IUSE="alsa big-endian cups debug doc examples headless-awt javafx +jbootstrap selinux source +system-bootstrap systemtap"
 
 REQUIRED_USE="
 	javafx? ( alsa !headless-awt )
 	!system-bootstrap? ( jbootstrap )
-	!system-bootstrap? ( || ( ppc64 x86 ) )
+	!system-bootstrap? ( ppc64 )
 "
 
 COMMON_DEPEND="
@@ -100,11 +124,10 @@ DEPEND="
 	x11-libs/libXrender
 	x11-libs/libXt
 	x11-libs/libXtst
-	javafx? ( dev-java/openjfx:${SLOT}= )
 	system-bootstrap? (
 		|| (
-			dev-java/openjdk-bin:${SLOT}
 			dev-java/openjdk:23
+			dev-java/openjdk-bin:${SLOT}
 			dev-java/openjdk:${SLOT}
 		)
 	)
@@ -136,7 +159,7 @@ pkg_setup() {
 
 	[[ ${MERGE_TYPE} == "binary" ]] && return
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-23 openjdk-bin-${SLOT}"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} dev-java/openjdk:23 openjdk-bin-${SLOT}"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -163,6 +186,8 @@ src_prepare() {
 }
 
 src_configure() {
+	local myconf=()
+
 	if has_version dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
 	elif has_version dev-java/openjdk:23; then
@@ -178,18 +203,18 @@ src_configure() {
 		export JDK_HOME
 	fi
 
-	# Work around stack alignment issue, bug #647954. in case we ever have x86
-	use x86 && append-flags -mincoming-stack-boundary=2
-
 	# bug 906987; append-cppflags doesnt work
 	use elibc_musl && append-flags -D_LARGEFILE64_SOURCE
 
 	# Strip some flags users may set, but should not. #818502
 	filter-flags -fexceptions
 
-	# Strip lto related flags, we rely on USE=lto and --with-jvm-features=link-time-opt
-	# https://bugs.gentoo.org/833097
-	# https://bugs.gentoo.org/833098
+	# Strip lto related flags, we rely on --with-jvm-features=link-time-opt
+	# See bug #833097 and bug #833098.
+	#
+	# .. but because of -Werror=odr (bug #916735), we disable it
+	# entirely for now.
+	#tc-is-lto && myconf+=( --with-jvm-features=link-time-opt )
 	filter-lto
 	filter-flags -fdevirtualize-at-ltrans
 
@@ -197,7 +222,7 @@ src_configure() {
 	# explicitly disabled, the flag will get auto-enabled if pandoc and
 	# graphviz are detected. pandoc has loads of dependencies anyway.
 
-	local myconf=(
+	myconf+=(
 		--disable-ccache
 		--disable-precompiled-headers
 		--disable-warnings-as-errors
@@ -220,8 +245,8 @@ src_configure() {
 		--with-vendor-vm-bug-url="https://bugs.openjdk.java.net"
 		--with-vendor-version-string="${PVR}"
 		--with-version-pre=""
-		--with-version-string="${PV%_p*}"
-		--with-version-build="${PV#*_p}"
+		--with-version-string="${MY_VERSION_STRING}"
+		--with-version-build="${MY_VERSION_BUILD}"
 		--with-zlib="${XPAK_BOOTSTRAP:-system}"
 		--enable-jvm-feature-dtrace=$(usex systemtap yes no)
 		--enable-headless-only=$(usex headless-awt yes no)
@@ -229,12 +254,6 @@ src_configure() {
 	)
 
 	use riscv && myconf+=( --with-boot-jdk-jvmargs="-Djdk.lang.Process.launchMechanism=vfork" )
-
-	# Werror=odr
-	# https://bugs.gentoo.org/916735
-	#
-	# Disable it for now.
-	#use lto && myconf+=( --with-jvm-features=link-time-opt )
 
 	if use javafx; then
 		local zip="${EPREFIX}/usr/$(get_libdir)/openjfx-${SLOT}/javafx-exports.zip"
@@ -282,6 +301,9 @@ src_compile() {
 src_install() {
 	local dest="/usr/$(get_libdir)/${PN}-${SLOT}"
 	local ddest="${ED}/${dest#/}"
+
+	# https://bugs.gentoo.org/922741
+	docompress "${dest}/man"
 
 	cd "${S}"/build/*-release/images/jdk || die
 
