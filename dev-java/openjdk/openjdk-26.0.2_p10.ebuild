@@ -1,21 +1,18 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-# Avoid circular dependency
-JAVA_DISABLE_DEPEND_ON_JAVA_DEP_CHECK="true"
-
-inherit check-reqs flag-o-matic java-pkg-2 java-vm-2 multiprocessing toolchain-funcs
+inherit check-reqs dot-a flag-o-matic java-pkg-2 java-vm-2 multiprocessing toolchain-funcs
 
 # variable name format: <UPPERCASE_KEYWORD>_XPAK
-PPC64_XPAK="21.0.0_p35" # big-endian bootstrap tarball
+PPC64_XPAK="25_p36" # big-endian bootstrap tarball
 
 # Usage: bootstrap_uri <keyword> <version> [extracond]
 # Example: $(bootstrap_uri ppc64 17.0.1_p12 big-endian)
 # Output: ppc64? ( big-endian? ( https://...17.0.1_p12-ppc64.tar.xz ) )
 bootstrap_uri() {
-	local baseuri="https://dev.gentoo.org/~arthurzam/distfiles/dev-java/${PN}/${PN}-bootstrap"
+	local baseuri="https://distfiles.gentoo.org/pub/dev/arthurzam@gentoo.org/dev-java/${PN}/${PN}-bootstrap"
 	local suff="tar.xz"
 	local kw="${1:?${FUNCNAME[0]}: keyword not specified}"
 	local ver="${2:?${FUNCNAME[0]}: version not specified}"
@@ -71,12 +68,11 @@ S="${WORKDIR}/${JDK_REPO}-jdk-${MY_PV//+/-}"
 
 LICENSE="GPL-2-with-classpath-exception"
 SLOT="$(ver_cut 1)"
-KEYWORDS="~amd64"
+KEYWORDS="~amd64 ~arm64 ~ppc64 ~riscv"
 
-IUSE="alsa big-endian cups debug doc examples headless-awt javafx +jbootstrap selinux source +system-bootstrap systemtap"
+IUSE="alsa big-endian cups debug doc examples headless-awt +jbootstrap selinux source static-libs +system-bootstrap systemtap"
 
 REQUIRED_USE="
-	javafx? ( alsa !headless-awt )
 	!system-bootstrap? ( jbootstrap )
 	!system-bootstrap? ( ppc64 )
 "
@@ -87,16 +83,7 @@ COMMON_DEPEND="
 	media-libs/harfbuzz:=
 	media-libs/libpng:0=
 	media-libs/lcms:2=
-	sys-libs/zlib
-	media-libs/libjpeg-turbo:0=
-	systemtap? ( dev-debug/systemtap )
-"
-
-# Many libs are required to build, but not to run, make is possible to remove
-# by listing conditionally in RDEPEND unconditionally in DEPEND
-RDEPEND="
-	${COMMON_DEPEND}
-	>=sys-apps/baselayout-java-0.1.0-r1
+	virtual/zlib:=
 	!headless-awt? (
 		x11-libs/libX11
 		x11-libs/libXext
@@ -106,6 +93,15 @@ RDEPEND="
 		x11-libs/libXt
 		x11-libs/libXtst
 	)
+	media-libs/libjpeg-turbo:0=
+	systemtap? ( dev-debug/systemtap )
+"
+
+# Many libs are required to build, but not to run, make is possible to remove
+# by listing conditionally in RDEPEND unconditionally in DEPEND
+RDEPEND="
+	${COMMON_DEPEND}
+	>=sys-apps/baselayout-java-0.1.0-r1
 	alsa? ( media-libs/alsa-lib )
 	cups? ( net-print/cups )
 	selinux? ( sec-policy/selinux-java )
@@ -116,19 +112,11 @@ DEPEND="
 	app-arch/zip
 	media-libs/alsa-lib
 	net-print/cups
-	x11-base/xorg-proto
-	x11-libs/libX11
-	x11-libs/libXext
-	x11-libs/libXi
-	x11-libs/libXrandr
-	x11-libs/libXrender
-	x11-libs/libXt
-	x11-libs/libXtst
-	javafx? ( dev-java/openjfx:${SLOT}= )
+	!headless-awt? ( x11-base/xorg-proto )
 	system-bootstrap? (
 		|| (
-			dev-java/openjdk:24
 			dev-java/openjdk-bin:${SLOT}
+			dev-java/openjdk:25
 			dev-java/openjdk:${SLOT}
 		)
 	)
@@ -160,7 +148,7 @@ pkg_setup() {
 
 	[[ ${MERGE_TYPE} == "binary" ]] && return
 
-	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} dev-java/openjdk:24 openjdk-bin-${SLOT}"
+	JAVA_PKG_WANT_BUILD_VM="openjdk-${SLOT} openjdk-25 openjdk-bin-${SLOT}"
 	JAVA_PKG_WANT_SOURCE="${SLOT}"
 	JAVA_PKG_WANT_TARGET="${SLOT}"
 
@@ -191,8 +179,8 @@ src_configure() {
 
 	if has_version dev-java/openjdk:${SLOT}; then
 		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-${SLOT}
-	elif has_version dev-java/openjdk:24; then
-		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-24
+	elif has_version dev-java/openjdk:25; then
+		export JDK_HOME=${BROOT}/usr/$(get_libdir)/openjdk-25
 	elif use !system-bootstrap ; then
 		local xpakvar="${ARCH^^}_XPAK"
 		export JDK_HOME="${WORKDIR}/openjdk-bootstrap-${!xpakvar}"
@@ -218,6 +206,10 @@ src_configure() {
 	#tc-is-lto && myconf+=( --with-jvm-features=link-time-opt )
 	filter-lto
 	filter-flags -fdevirtualize-at-ltrans
+
+	if use static-libs ; then
+		lto-guarantee-fat
+	fi
 
 	# Enabling full docs appears to break doc building. If not
 	# explicitly disabled, the flag will get auto-enabled if pandoc and
@@ -256,15 +248,6 @@ src_configure() {
 
 	use riscv && myconf+=( --with-boot-jdk-jvmargs="-Djdk.lang.Process.launchMechanism=vfork" )
 
-	if use javafx; then
-		local zip="${EPREFIX}/usr/$(get_libdir)/openjfx-${SLOT}/javafx-exports.zip"
-		if [[ -r ${zip} ]]; then
-			myconf+=( --with-import-modules="${zip}" )
-		else
-			die "${zip} not found or not readable"
-		fi
-	fi
-
 	# Workaround for bug #938302
 	if use systemtap && has_version "dev-debug/systemtap[-dtrace-symlink(+)]" ; then
 		myconf+=( DTRACE="${BROOT}"/usr/bin/stap-dtrace )
@@ -292,9 +275,13 @@ src_compile() {
 		JOBS=$(makeopts_jobs)
 		LOG=debug
 		CFLAGS_WARNINGS_ARE_ERRORS= # No -Werror
+		# Respect user -O<value>, bug #969169
+		OPTIMIZATION=
+		JVM_OPTIMIZATION=
 		NICE= # Use PORTAGE_NICENESS, don't adjust further down
 		$(usex doc docs '')
 		$(usex jbootstrap bootcycle-images product-images)
+		$(usev static-libs static-libs-image)
 	)
 	emake "${myemakeargs[@]}" -j1
 }
@@ -347,7 +334,12 @@ src_install() {
 	if use doc ; then
 		docinto html
 		dodoc -r "${S}"/build/*-release/images/docs/*
-		dosym ../../../usr/share/doc/"${PF}" /usr/share/doc/"${PN}-${SLOT}"
+	fi
+
+	if use static-libs ; then
+		cd "${S}"/build/*-release/images/static-libs || die
+		cp -pPR * "${ddest}" || die
+		strip-lto-bytecode "${ddest}" || die
 	fi
 }
 
